@@ -17,7 +17,6 @@ public class GridManager
     readonly IGravityHandler gravityHandler;
     readonly ITileGenerator tileGenerator;
     readonly IGridValidator gridValidator;
-    readonly IBoosterHandler boosterHandler;
 
     static readonly TileType[] DefaultTypes = new[]
    {
@@ -32,8 +31,7 @@ public class GridManager
         IMatchDetector matchDetector = null,
         IGravityHandler gravityHandler = null,
         ITileGenerator tileGenerator = null,
-        IGridValidator gridValidator = null,
-        IBoosterHandler boosterHandler = null)
+        IGridValidator gridValidator = null)
     {
         Width = width;
         Height = height;
@@ -41,7 +39,6 @@ public class GridManager
         this.gravityHandler = gravityHandler ?? new VerticalGravityHandler();
         this.tileGenerator = tileGenerator ?? new RandomTileGenerator(seed, DefaultTypes);
         this.gridValidator = gridValidator ?? new GridValidator();
-        this.boosterHandler = boosterHandler ?? new RowBoosterHandler();
         Initialize(seed);
     }
 
@@ -119,9 +116,9 @@ public class GridManager
         foreach (var pos in toClear)
         {
             var tile = Grid[pos.x, pos.y];
-            if (tile != null && tile.Type == TileType.RowBooster && boosterHandler.CanHandle(tile.Type))
+            if (tile != null)
             {
-                boosterExpansions.AddRange(boosterHandler.GetAffectedTiles(Grid, tile));
+                boosterExpansions.AddRange(GetBoosterExpansion(tile));
             }
         }
         foreach (var tile in boosterExpansions)
@@ -197,10 +194,7 @@ public class GridManager
         if (!position.IsValid(Width, Height)) return result;
         var tile = Grid[position.X, position.Y];
         if (tile == null) return result;
-        if (tile.Type == TileType.RowBooster && boosterHandler.CanHandle(tile.Type))
-        {
-            result.AddRange(boosterHandler.GetAffectedTiles(Grid, tile));
-        }
+        result.AddRange(GetBoosterExpansion(tile));
         return result;
     }
 
@@ -255,5 +249,29 @@ public class GridManager
         Grid[pb.X, pb.Y] = a;
         if (a != null) a.Position = pb;
         if (b != null) b.Position = pa;
+    }
+
+    List<Tile> GetBoosterExpansion(Tile boosterTile)
+    {
+        var result = new List<Tile>();
+        if (boosterTile == null) return result;
+
+        switch (boosterTile.Type)
+        {
+            case TileType.RowBooster:
+                int y = boosterTile.Position.Y;
+                for (int x = 0; x < Width; x++)
+                {
+                    var tile = Grid[x, y];
+                    if (tile != null) result.Add(tile);
+                }
+                break;
+            // Add future booster types here:
+            // case TileType.ColumnBooster:
+            //     ...
+            //     break;
+        }
+
+        return result;
     }
 }
