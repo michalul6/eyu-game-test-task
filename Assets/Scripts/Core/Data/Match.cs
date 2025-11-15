@@ -4,7 +4,7 @@ public enum MatchType
 {
     Horizontal,
     Vertical,
-    Special // For booster matches
+    RowBooster // For booster activation matches
 }
 
 public class Match

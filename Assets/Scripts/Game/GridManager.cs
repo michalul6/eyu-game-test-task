@@ -101,7 +101,7 @@ public class GridManager
             }
 
             // Booster creation rule: only for normal matches, not for special (e.g., booster activation)
-            if (match.Type != MatchType.Special && match.Tiles != null && match.Tiles.Count >= MinTilesForBooster)
+            if (match.Type != MatchType.RowBooster && match.Tiles != null && match.Tiles.Count >= MinTilesForBooster)
             {
                 // Deterministic choice: take the middle tile of the run
                 int idx = match.Tiles.Count / 2; // for even lengths, picks the left/lower middle
@@ -206,8 +206,6 @@ public class GridManager
 
     /// <summary>
     /// Swaps two adjacent tiles and checks if a match is created.
-    /// Does NOT process cascades or revert - caller must handle those separately.
-    /// This is the required Swap API for animated game flow.
     /// </summary>
     /// <param name="a">First tile to swap</param>
     /// <param name="b">Second tile to swap (must be adjacent to tile a)</param>

@@ -228,7 +228,7 @@ public class GameController : MonoBehaviour
             }
 
             // Clear from grid using a synthetic match so booster expansion logic applies consistently
-            var syntheticMatch = new Match(new List<Tile>(affected), MatchType.Special);
+            var syntheticMatch = new Match(new List<Tile>(affected), MatchType.RowBooster);
             gridManager.Clear(new List<Match> { syntheticMatch });
 
             // Capture positions before gravity to compute movements

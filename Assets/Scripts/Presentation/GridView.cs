@@ -7,12 +7,7 @@ public class GridView : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] TileView tilePrefab;
-    [SerializeField] Transform gridRoot;
     [SerializeField] TileColors tileColors;
-
-    [Header("Layout")]
-    [SerializeField] Vector3 gridOriginWorld = Vector3.zero;
-    [SerializeField] float cellSize = 1f;
 
     [Header("Animation")]
     [SerializeField] float swapDuration = 0.15f;
@@ -33,7 +28,7 @@ public class GridView : MonoBehaviour
         // Initialize pool if needed
         if (pool == null)
         {
-            var parent = gridRoot != null ? gridRoot : transform;
+            var parent = transform;
             pool = new TileViewPool(tilePrefab, parent);
         }
 
@@ -186,7 +181,7 @@ public class GridView : MonoBehaviour
 
     Vector3 GetWorldPosition(GridPosition pos)
     {
-        return gridOriginWorld + new Vector3(pos.X * cellSize, pos.Y * cellSize, 0f);
+        return new Vector3(pos.X, pos.Y, 0f);
     }
 
     public Vector3 GetWorldPositionPublic(GridPosition pos)
