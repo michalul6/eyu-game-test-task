@@ -253,7 +253,7 @@ public class GameController : MonoBehaviour
                 for (int x = 0; x < gridManager.Width; x++)
                 {
                     var t = gridManager.Grid[x, y];
-                    if (t != null && beforeGravity.TryGetValue(t, out var prev) && !prev.Equals(t.Position))
+                    if (t != null && beforeGravity.TryGetValue(t, out var prev) && !prev.Compare(t.Position))
                     {
                         movements[t] = t.Position;
                     }
@@ -414,7 +414,7 @@ public class GameController : MonoBehaviour
                     var tile = gridManager.Grid[x, y];
                     if (tile != null && beforeGravity.ContainsKey(tile))
                     {
-                        if (!beforeGravity[tile].Equals(tile.Position))
+                        if (!beforeGravity[tile].Compare(tile.Position))
                         {
                             movements[tile] = tile.Position;
                         }
