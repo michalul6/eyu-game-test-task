@@ -1,0 +1,333 @@
+using System;
+using System.Collections.Generic;
+
+public class GridManager
+{
+    public int Width { get; private set; }
+    public int Height { get; private set; }
+    public Tile[,] Grid { get; private set; }
+
+    /// <summary>
+    /// Minimum number of matched tiles required to create a booster.
+    /// Set to 4 by default. Set higher to make boosters rarer, or to int.MaxValue to disable booster creation.
+    /// </summary>
+    public int MinTilesForBooster { get; set; } = 4;
+
+    readonly IMatchDetector matchDetector;
+    readonly IGravityHandler gravityHandler;
+    readonly ITileGenerator tileGenerator;
+    readonly IGridValidator gridValidator;
+    readonly IBoosterHandler boosterHandler;
+
+    static readonly TileType[] DefaultTypes = new[]
+   {
+        TileType.Red, TileType.Blue, TileType.Green,
+        TileType.Yellow, TileType.Purple, TileType.Orange
+    };
+
+    public GridManager(
+        int width = 6,
+        int height = 6,
+        int seed = 12345,
+        IMatchDetector matchDetector = null,
+        IGravityHandler gravityHandler = null,
+        ITileGenerator tileGenerator = null,
+        IGridValidator gridValidator = null,
+        IBoosterHandler boosterHandler = null)
+    {
+        Width = width;
+        Height = height;
+        this.matchDetector = matchDetector ?? new StandardMatchDetector();
+        this.gravityHandler = gravityHandler ?? new VerticalGravityHandler();
+        this.tileGenerator = tileGenerator ?? new RandomTileGenerator(seed, DefaultTypes);
+        this.gridValidator = gridValidator ?? new GridValidator();
+        this.boosterHandler = boosterHandler ?? new RowBoosterHandler();
+        Initialize(seed);
+    }
+
+    public void Initialize(int seed)
+    {
+        tileGenerator.SetRandomSeed(seed);
+        Grid = new Tile[Width, Height];
+        const int maxAttempts = 2000;
+        int attempts = 0;
+        while (true)
+        {
+            attempts++;
+            // Fill randomly - each CreateRandomTile() call advances the random state,
+            // so re-rolls will produce different grids even with the same initial seed
+            for (int y = 0; y < Height; y++)
+            {
+                for (int x = 0; x < Width; x++)
+                {
+                    Grid[x, y] = tileGenerator.CreateRandomTile(new GridPosition(x, y));
+                }
+            }
+            // If any starting matches, re-roll
+            if (gridValidator.HasMatches(Grid, matchDetector))
+            {
+                if (attempts >= maxAttempts) break; // fallback to avoid infinite loop
+                continue;
+            }
+            // Optional: ensure at least one possible move
+            if (!gridValidator.HasPossibleMoves(Grid))
+            {
+                if (attempts >= maxAttempts) break;
+                continue;
+            }
+            break;
+        }
+    }
+
+    // Required APIs
+    public List<Match> FindMatches()
+    {
+        return matchDetector.FindMatches(Grid);
+    }
+
+    public void Clear(List<Match> matches)
+    {
+        if (matches == null || matches.Count == 0) return;
+
+        var toClear = new HashSet<(int x, int y)>();
+        var boosterPositions = new HashSet<(int x, int y)>();
+
+        // Collect all tiles from matches
+        foreach (var match in matches)
+        {
+            foreach (var tile in match.Tiles)
+            {
+                toClear.Add((tile.Position.X, tile.Position.Y));
+            }
+
+            // Booster creation rule: only for normal matches, not for special (e.g., booster activation)
+            if (match.Type != MatchType.Special && match.Tiles != null && match.Tiles.Count >= MinTilesForBooster)
+            {
+                // Deterministic choice: take the middle tile of the run (ordered by detector)
+                int idx = match.Tiles.Count / 2; // for even lengths, picks the left/lower middle
+                var candidate = match.Tiles[idx];
+                if (candidate != null)
+                {
+                    var pos = (candidate.Position.X, candidate.Position.Y);
+                    boosterPositions.Add(pos);
+                }
+            }
+        }
+
+        // Expand via boosters present in the clear set
+        var boosterExpansions = new List<Tile>();
+        foreach (var pos in toClear)
+        {
+            var tile = Grid[pos.x, pos.y];
+            if (tile != null && tile.Type == TileType.RowBooster && boosterHandler.CanHandle(tile.Type))
+            {
+                boosterExpansions.AddRange(boosterHandler.GetAffectedTiles(Grid, tile));
+            }
+        }
+        foreach (var tile in boosterExpansions)
+        {
+            toClear.Add((tile.Position.X, tile.Position.Y));
+        }
+
+        // Do not clear the selected booster positions; instead, transform them after clearing others
+        foreach (var bpos in boosterPositions)
+        {
+            toClear.Remove(bpos);
+        }
+
+        // Execute clear
+        foreach (var pos in toClear)
+        {
+            var tile = Grid[pos.x, pos.y];
+            if (tile != null)
+            {
+                tile.IsMatched = true;
+                Grid[pos.x, pos.y] = null;
+            }
+        }
+
+        // Transform selected survivor tiles into boosters
+        foreach (var bpos in boosterPositions)
+        {
+            var tile = Grid[bpos.x, bpos.y];
+            if (tile != null)
+            {
+                tile.Type = TileType.RowBooster;
+                tile.IsMatched = false;
+            }
+            else
+            {
+                // Fallback: if tile was somehow cleared (overlap edge case), recreate a booster here
+                Grid[bpos.x, bpos.y] = new Tile(TileType.RowBooster, new GridPosition(bpos.x, bpos.y));
+            }
+        }
+    }
+
+    public void ApplyGravity()
+    {
+        gravityHandler.ApplyGravity(Grid);
+    }
+
+    public void Refill()
+    {
+        for (int y = Height - 1; y >= 0; y--)
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                if (Grid[x, y] == null)
+                {
+                    Grid[x, y] = tileGenerator.CreateRandomTile(new GridPosition(x, y));
+                }
+            }
+        }
+    }
+
+    public bool HasAnyMoves()
+    {
+        return gridValidator.HasPossibleMoves(Grid);
+    }
+
+    public bool ActivateBoosterAt(GridPosition position)
+    {
+        if (!position.IsValid(Width, Height)) return false;
+        var tile = Grid[position.X, position.Y];
+        if (tile == null || tile.Type != TileType.RowBooster || !boosterHandler.CanHandle(tile.Type))
+            return false;
+
+        var affected = boosterHandler.GetAffectedTiles(Grid, tile);
+        var toClear = new HashSet<(int x, int y)>();
+        foreach (var t in affected)
+        {
+            if (t != null)
+                toClear.Add((t.Position.X, t.Position.Y));
+        }
+        foreach (var pos in toClear)
+        {
+            Grid[pos.x, pos.y] = null;
+        }
+        gravityHandler.ApplyGravity(Grid);
+        Refill();
+        ProcessCascade();
+        return true;
+    }
+
+    /// <summary>
+    /// Returns the tiles that would be affected if the booster at position is activated, without mutating the grid.
+    /// Returns an empty list if position is invalid or does not contain a supported booster.
+    /// </summary>
+    public List<Tile> GetBoosterAffectedTiles(GridPosition position)
+    {
+        var result = new List<Tile>();
+        if (!position.IsValid(Width, Height)) return result;
+        var tile = Grid[position.X, position.Y];
+        if (tile == null) return result;
+        if (tile.Type == TileType.RowBooster && boosterHandler.CanHandle(tile.Type))
+        {
+            result.AddRange(boosterHandler.GetAffectedTiles(Grid, tile));
+        }
+        return result;
+    }
+
+    public bool Swap(Tile a, Tile b)
+    {
+        if (a == null || b == null) return false;
+        var pa = a.Position;
+        var pb = b.Position;
+        if (Math.Abs(pa.X - pb.X) + Math.Abs(pa.Y - pb.Y) != 1) return false; // must be adjacent (4-neighbor)
+
+        // Apply swap in grid
+        SwapTilesInGrid(pa, pb);
+
+        var matches = matchDetector.FindMatches(Grid);
+        bool aIsBooster = a.Type == TileType.RowBooster;
+        bool bIsBooster = b.Type == TileType.RowBooster;
+
+        if (matches != null && matches.Count > 0)
+        {
+            ProcessCascade(matches);
+            return true;
+        }
+        else if (aIsBooster || bIsBooster)
+        {
+            // Activate booster(s) even if no normal match
+            var toClear = new HashSet<(int x, int y)>();
+            if (aIsBooster && boosterHandler.CanHandle(a.Type))
+            {
+                foreach (var t in boosterHandler.GetAffectedTiles(Grid, a))
+                    toClear.Add((t.Position.X, t.Position.Y));
+            }
+            if (bIsBooster && boosterHandler.CanHandle(b.Type))
+            {
+                foreach (var t in boosterHandler.GetAffectedTiles(Grid, b))
+                    toClear.Add((t.Position.X, t.Position.Y));
+            }
+            foreach (var pos in toClear)
+            {
+                Grid[pos.x, pos.y] = null;
+            }
+            gravityHandler.ApplyGravity(Grid);
+            Refill();
+            // After booster activation, cascades may occur
+            ProcessCascade();
+            return true;
+        }
+        else
+        {
+            // Revert swap (invalid move)
+            SwapTilesInGrid(pb, pa);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Swaps two tiles without processing cascades. Used for animated swaps.
+    /// Returns true if the swap creates a match (but doesn't process it).
+    /// Does NOT automatically revert - caller must handle revert if needed.
+    /// </summary>
+    public bool SwapWithoutCascade(Tile a, Tile b)
+    {
+        if (a == null || b == null) return false;
+        var pa = a.Position;
+        var pb = b.Position;
+        if (Math.Abs(pa.X - pb.X) + Math.Abs(pa.Y - pb.Y) != 1) return false;
+
+        // Apply swap
+        SwapTilesInGrid(pa, pb);
+
+        // Check if swap creates matches
+        var matches = matchDetector.FindMatches(Grid);
+        bool createsMatch = matches != null && matches.Count > 0;
+
+        return createsMatch;
+    }
+
+    // Helpers
+    void ProcessCascade(List<Match> initial = null)
+    {
+        if (initial != null && initial.Count > 0)
+        {
+            Clear(initial);
+            gravityHandler.ApplyGravity(Grid);
+            Refill();
+        }
+
+        while (true)
+        {
+            var matches = matchDetector.FindMatches(Grid);
+            if (matches == null || matches.Count == 0) break;
+            Clear(matches);
+            gravityHandler.ApplyGravity(Grid);
+            Refill();
+        }
+    }
+
+    void SwapTilesInGrid(GridPosition pa, GridPosition pb)
+    {
+        var a = Grid[pa.X, pa.Y];
+        var b = Grid[pb.X, pb.Y];
+        Grid[pa.X, pa.Y] = b;
+        Grid[pb.X, pb.Y] = a;
+        if (a != null) a.Position = pb;
+        if (b != null) b.Position = pa;
+    }
+}

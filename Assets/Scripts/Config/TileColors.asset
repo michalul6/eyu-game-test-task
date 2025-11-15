@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8b9ae9f922856490c93437a8811fe22e, type: 3}
+  m_Name: TileColors
+  m_EditorClassIdentifier: 
+  mappings:
+  - type: 1
+    color: {r: 1, g: 0, b: 0, a: 1}
+  - type: 2
+    color: {r: 0, g: 0.16973758, b: 1, a: 1}
+  - type: 3
+    color: {r: 0, g: 1, b: 0.07986307, a: 1}
+  - type: 4
+    color: {r: 0.97504056, g: 1, b: 0, a: 1}
+  - type: 5
+    color: {r: 0.7410197, g: 0, b: 1, a: 1}
+  - type: 6
+    color: {r: 1, g: 0.46095717, b: 0, a: 1}
+  - type: 7
+    color: {r: 0.3679245, g: 0.3679245, b: 0.3679245, a: 1}
