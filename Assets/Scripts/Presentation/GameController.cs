@@ -33,10 +33,6 @@ public class GameController : MonoBehaviour
     }
 
     [Header("Screen->Grid Mapping")]
-    [Tooltip("World-space origin (bottom-left) of the grid")]
-    [SerializeField] Vector3 gridOriginWorld = Vector3.zero;
-    [Tooltip("World units per grid cell (assumes square cells)")]
-    [SerializeField] float cellSize = 1f;
     [Tooltip("Pixels; below this delta is treated as a tap, otherwise a swipe")]
     [SerializeField] float swipeThresholdPixels = 18f;
 
@@ -328,7 +324,7 @@ public class GameController : MonoBehaviour
         var origWorldPosB = gridView.GetWorldPositionPublic(origPosB);
 
         // Perform logical swap (this updates tile positions but doesn't process cascades)
-        bool createsMatch = gridManager.SwapWithoutCascade(a, b);
+        bool createsMatch = gridManager.Swap(a, b);
 
         // Animate the swap forward
         await gridView.AnimateSwap(a, b);
@@ -373,7 +369,7 @@ public class GameController : MonoBehaviour
             }
 
             // Now revert the logical swap
-            gridManager.SwapWithoutCascade(a, b);
+            gridManager.Swap(a, b);
         }
 
         isProcessing = false;
@@ -488,20 +484,20 @@ public class GameController : MonoBehaviour
         }
 
         // Offset by half cell because sprites are centered on their positions
-        float localX = (world.x - gridOriginWorld.x) + (cellSize * 0.5f);
-        float localY = (world.y - gridOriginWorld.y) + (cellSize * 0.5f);
+        float localX = world.x + 0.5f;
+        float localY = world.y + 0.5f;
 
         // Check if click is actually within grid bounds in world space
-        float maxX = width * cellSize;
-        float maxY = height * cellSize;
+        float maxX = width;
+        float maxY = height;
         if (localX < 0 || localX >= maxX || localY < 0 || localY >= maxY)
         {
             Log($"[GameController] ScreenToGrid: screen {screenPos} → world {world} → local {localX},{localY} → OUT OF BOUNDS (grid world bounds: 0-{maxX}, 0-{maxY})");
             return new GridPosition(-1, -1); // Return invalid position
         }
 
-        int gx = Mathf.FloorToInt(localX / Mathf.Max(0.0001f, cellSize));
-        int gy = Mathf.FloorToInt(localY / Mathf.Max(0.0001f, cellSize));
+        int gx = Mathf.FloorToInt(localX / Mathf.Max(0.0001f, 1F));
+        int gy = Mathf.FloorToInt(localY / Mathf.Max(0.0001f, 1F));
         Log($"[GameController] ScreenToGrid: screen {screenPos} → world {world} → local (offset) {localX},{localY} → grid {gx},{gy}");
         return new GridPosition(gx, gy);
     }

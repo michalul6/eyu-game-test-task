@@ -70,7 +70,7 @@ public class GridManager
                 continue;
             }
             // Optional: ensure at least one possible move
-            if (!gridValidator.HasPossibleMoves(Grid))
+            if (!HasAnyMoves())
             {
                 if (attempts >= maxAttempts) break;
                 continue;
@@ -228,63 +228,15 @@ public class GridManager
         return result;
     }
 
-    public bool Swap(Tile a, Tile b)
-    {
-        if (a == null || b == null) return false;
-        var pa = a.Position;
-        var pb = b.Position;
-        if (Math.Abs(pa.X - pb.X) + Math.Abs(pa.Y - pb.Y) != 1) return false; // must be adjacent (4-neighbor)
-
-        // Apply swap in grid
-        SwapTilesInGrid(pa, pb);
-
-        var matches = matchDetector.FindMatches(Grid);
-        bool aIsBooster = a.Type == TileType.RowBooster;
-        bool bIsBooster = b.Type == TileType.RowBooster;
-
-        if (matches != null && matches.Count > 0)
-        {
-            ProcessCascade(matches);
-            return true;
-        }
-        else if (aIsBooster || bIsBooster)
-        {
-            // Activate booster(s) even if no normal match
-            var toClear = new HashSet<(int x, int y)>();
-            if (aIsBooster && boosterHandler.CanHandle(a.Type))
-            {
-                foreach (var t in boosterHandler.GetAffectedTiles(Grid, a))
-                    toClear.Add((t.Position.X, t.Position.Y));
-            }
-            if (bIsBooster && boosterHandler.CanHandle(b.Type))
-            {
-                foreach (var t in boosterHandler.GetAffectedTiles(Grid, b))
-                    toClear.Add((t.Position.X, t.Position.Y));
-            }
-            foreach (var pos in toClear)
-            {
-                Grid[pos.x, pos.y] = null;
-            }
-            gravityHandler.ApplyGravity(Grid);
-            Refill();
-            // After booster activation, cascades may occur
-            ProcessCascade();
-            return true;
-        }
-        else
-        {
-            // Revert swap (invalid move)
-            SwapTilesInGrid(pb, pa);
-            return false;
-        }
-    }
-
     /// <summary>
-    /// Swaps two tiles without processing cascades. Used for animated swaps.
-    /// Returns true if the swap creates a match (but doesn't process it).
-    /// Does NOT automatically revert - caller must handle revert if needed.
+    /// Swaps two adjacent tiles and checks if a match is created.
+    /// Does NOT process cascades or revert - caller must handle those separately.
+    /// This is the required Swap API for animated game flow.
     /// </summary>
-    public bool SwapWithoutCascade(Tile a, Tile b)
+    /// <param name="a">First tile to swap</param>
+    /// <param name="b">Second tile to swap (must be adjacent to tile a)</param>
+    /// <returns>True if swap creates a match, false otherwise</returns>
+    public bool Swap(Tile a, Tile b)
     {
         if (a == null || b == null) return false;
         var pa = a.Position;
