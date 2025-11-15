@@ -201,12 +201,6 @@ public class GridView : MonoBehaviour
         return view;
     }
 
-    public TileView GetViewAt(GridPosition pos)
-    {
-        if (pos.X < 0 || pos.X >= width || pos.Y < 0 || pos.Y >= height) return null;
-        return tileViews[pos.X, pos.Y];
-    }
-
     public async UniTask AnimateSwap(Tile a, Tile b, CancellationToken ct = default)
     {
         var viewA = GetViewForTile(a);

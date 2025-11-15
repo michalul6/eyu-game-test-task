@@ -69,7 +69,7 @@ public class GridManager
                 if (attempts >= maxAttempts) break; // fallback to avoid infinite loop
                 continue;
             }
-            // Optional: ensure at least one possible move
+            // Ensure at least one possible move
             if (!HasAnyMoves())
             {
                 if (attempts >= maxAttempts) break;
@@ -103,7 +103,7 @@ public class GridManager
             // Booster creation rule: only for normal matches, not for special (e.g., booster activation)
             if (match.Type != MatchType.Special && match.Tiles != null && match.Tiles.Count >= MinTilesForBooster)
             {
-                // Deterministic choice: take the middle tile of the run (ordered by detector)
+                // Deterministic choice: take the middle tile of the run
                 int idx = match.Tiles.Count / 2; // for even lengths, picks the left/lower middle
                 var candidate = match.Tiles[idx];
                 if (candidate != null)
@@ -185,30 +185,6 @@ public class GridManager
     public bool HasAnyMoves()
     {
         return gridValidator.HasPossibleMoves(Grid);
-    }
-
-    public bool ActivateBoosterAt(GridPosition position)
-    {
-        if (!position.IsValid(Width, Height)) return false;
-        var tile = Grid[position.X, position.Y];
-        if (tile == null || tile.Type != TileType.RowBooster || !boosterHandler.CanHandle(tile.Type))
-            return false;
-
-        var affected = boosterHandler.GetAffectedTiles(Grid, tile);
-        var toClear = new HashSet<(int x, int y)>();
-        foreach (var t in affected)
-        {
-            if (t != null)
-                toClear.Add((t.Position.X, t.Position.Y));
-        }
-        foreach (var pos in toClear)
-        {
-            Grid[pos.x, pos.y] = null;
-        }
-        gravityHandler.ApplyGravity(Grid);
-        Refill();
-        ProcessCascade();
-        return true;
     }
 
     /// <summary>

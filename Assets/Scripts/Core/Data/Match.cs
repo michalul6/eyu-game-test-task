@@ -17,6 +17,4 @@ public class Match
         Tiles = tiles ?? new List<Tile>(0);
         Type = type;
     }
-
-    public bool IsValid() => Tiles != null && Tiles.Count >= 3;
 }

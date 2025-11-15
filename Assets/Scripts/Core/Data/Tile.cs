@@ -10,13 +10,4 @@ public class Tile
         Position = position;
         IsMatched = false;
     }
-
-    public bool CanMatch(Tile other)
-    {
-        if (other == null) return false;
-        if (Type == TileType.None) return false;
-        // RowBooster is a special tile; matching rules handled by match logic.
-        // Keep CanMatch simple: same non-None type means can match.
-        return Type == other.Type;
-    }
 }

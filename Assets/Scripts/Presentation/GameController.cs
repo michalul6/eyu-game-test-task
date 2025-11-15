@@ -128,7 +128,6 @@ public class GameController : MonoBehaviour
         pressScreenPos = pointAction.ReadValue<Vector2>();
         pressGridPos = ScreenToGrid(pressScreenPos);
         isPointerDown = true;
-        Log($"[GameController] Pointer DOWN at screen {pressScreenPos} → grid {pressGridPos.X},{pressGridPos.Y}");
 
         // Highlight the pressed tile if valid
         if (pressGridPos.IsValid(gridManager.Width, gridManager.Height))
@@ -150,8 +149,6 @@ public class GameController : MonoBehaviour
         Vector2 releaseScreen = pointAction.ReadValue<Vector2>();
         Vector2 delta = releaseScreen - pressScreenPos;
 
-        Log($"[GameController] Pointer UP at screen {releaseScreen}, delta {delta.magnitude:F1} px (threshold={swipeThresholdPixels})");
-
         // Clear highlight on release
         ClearHighlight();
 
@@ -167,7 +164,7 @@ public class GameController : MonoBehaviour
             var dir = GetSwipeDirection(delta);
             var target = new GridPosition(pressGridPos.X + dir.x, pressGridPos.Y + dir.y);
             Log($"[GameController] SWIPE detected: {pressGridPos.X},{pressGridPos.Y} → {target.X},{target.Y}");
-            TrySwapAnimated(pressGridPos, target).Forget();
+            TrySwap(pressGridPos, target).Forget();
         }
     }
 
@@ -201,21 +198,17 @@ public class GameController : MonoBehaviour
 
     void TryTapBooster(GridPosition pos)
     {
-        Log($"[GameController] TryTapBooster at {pos.X},{pos.Y}, valid={pos.IsValid(gridManager.Width, gridManager.Height)}");
         if (!pos.IsValid(gridManager.Width, gridManager.Height))
         {
             LogWarning($"[GameController] Position {pos.X},{pos.Y} is out of bounds (grid size {gridManager.Width}x{gridManager.Height})");
             return;
         }
-        var tile = gridManager.Grid[pos.X, pos.Y];
-        string coloredTileInfo = GetColoredTileLogString(tile, pos);
-        Log($"[GameController] Tile at {pos.X},{pos.Y}: {coloredTileInfo}");
 
         // Run animated booster activation
-        ActivateBoosterAnimated(pos).Forget();
+        ActivateBooster(pos).Forget();
     }
 
-    async UniTask ActivateBoosterAnimated(GridPosition pos)
+    async UniTask ActivateBooster(GridPosition pos)
     {
         if (isProcessing) return;
         isProcessing = true;
@@ -225,7 +218,6 @@ public class GameController : MonoBehaviour
             var affected = gridManager.GetBoosterAffectedTiles(pos);
             if (affected == null || affected.Count == 0)
             {
-                Log($"[GameController] No booster effect at {pos.X},{pos.Y}.");
                 return;
             }
 
@@ -282,7 +274,7 @@ public class GameController : MonoBehaviour
             }
 
             // Resolve cascades as usual
-            await ProcessMatchesAnimated();
+            await ProcessMatches();
         }
         finally
         {
@@ -290,11 +282,8 @@ public class GameController : MonoBehaviour
         }
     }
 
-    // Removed legacy non-animated TrySwap in favor of TrySwapAnimated
-
-    async UniTaskVoid TrySwapAnimated(GridPosition from, GridPosition to)
+    async UniTaskVoid TrySwap(GridPosition from, GridPosition to)
     {
-        Log($"[GameController] TrySwapAnimated from {from.X},{from.Y} to {to.X},{to.Y}");
         isProcessing = true;
 
         if (!from.IsValid(gridManager.Width, gridManager.Height) || !to.IsValid(gridManager.Width, gridManager.Height))
@@ -315,8 +304,6 @@ public class GameController : MonoBehaviour
             return;
         }
 
-        Log($"[GameController] TileA: {a.Type} at ({from.X},{from.Y}), TileB: {b.Type} at ({to.X},{to.Y})");
-
         // Store original positions and world positions BEFORE any swap or view animation
         var origPosA = new GridPosition(from.X, from.Y);
         var origPosB = new GridPosition(to.X, to.Y);
@@ -334,7 +321,7 @@ public class GameController : MonoBehaviour
             Log($"[GameController] Valid swap; processing matches");
 
             // Process cascading matches
-            await ProcessMatchesAnimated();
+            await ProcessMatches();
         }
         else
         {
@@ -347,21 +334,11 @@ public class GameController : MonoBehaviour
 
             if (viewA != null && viewB != null)
             {
-                Log($"[GameController] ViewA: {viewA.name}, ViewB: {viewB.name}");
-                Log($"[GameController] ViewA current pos: {viewA.transform.position}");
-                Log($"[GameController] ViewB current pos: {viewB.transform.position}");
-                Log($"[GameController] Target pos A: {origWorldPosA}, Target pos B: {origWorldPosB}");
-                Log($"[GameController] Starting revert animations...");
-
                 // Start both animations in parallel
                 await UniTask.WhenAll(
                     viewA.AnimateMoveTo(origWorldPosA, 0.15f),
                     viewB.AnimateMoveTo(origWorldPosB, 0.15f)
                 );
-
-                Log($"[GameController] Revert animation complete");
-                Log($"[GameController] ViewA final pos: {viewA.transform.position}");
-                Log($"[GameController] ViewB final pos: {viewB.transform.position}");
             }
             else
             {
@@ -375,7 +352,7 @@ public class GameController : MonoBehaviour
         isProcessing = false;
     }
 
-    async UniTask ProcessMatchesAnimated()
+    async UniTask ProcessMatches()
     {
         while (true)
         {
@@ -492,42 +469,17 @@ public class GameController : MonoBehaviour
         float maxY = height;
         if (localX < 0 || localX >= maxX || localY < 0 || localY >= maxY)
         {
-            Log($"[GameController] ScreenToGrid: screen {screenPos} → world {world} → local {localX},{localY} → OUT OF BOUNDS (grid world bounds: 0-{maxX}, 0-{maxY})");
             return new GridPosition(-1, -1); // Return invalid position
         }
 
         int gx = Mathf.FloorToInt(localX / Mathf.Max(0.0001f, 1F));
         int gy = Mathf.FloorToInt(localY / Mathf.Max(0.0001f, 1F));
-        Log($"[GameController] ScreenToGrid: screen {screenPos} → world {world} → local (offset) {localX},{localY} → grid {gx},{gy}");
         return new GridPosition(gx, gy);
-    }
-
-    string GetColoredTileLogString(Tile tile, GridPosition pos)
-    {
-        if (tile == null) return "NULL";
-
-        string colorHex = GetTileColorHex(tile.Type);
-        return $"<color={colorHex}>{tile.Type}</color>";
-    }
-
-    string GetTileColorHex(TileType type)
-    {
-        switch (type)
-        {
-            case TileType.Red: return "#FF0000";
-            case TileType.Blue: return "#0000FF";
-            case TileType.Green: return "#00FF00";
-            case TileType.Yellow: return "#FFFF00";
-            case TileType.Purple: return "#9932CC";
-            case TileType.Orange: return "#FF8800";
-            case TileType.RowBooster: return "#FFFFFF";
-            default: return "#808080";
-        }
     }
 
     /// <summary>
     /// Performance test for match-clear-gravity-refill cycle.
-    /// Press 'P' key in Play mode to run this test.
+    /// Press 'T' key in Play mode to run this test.
     /// Target: < 2ms per cycle
     /// </summary>
     void RunPerformanceTest()
@@ -569,17 +521,17 @@ public class GameController : MonoBehaviour
         avg /= times.Count;
 
         Debug.Log($"[Performance Test] Iterations: {iterations}");
-        Debug.Log($"[Performance Test] Min: {min:F4}ms");
-        Debug.Log($"[Performance Test] Max: {max:F4}ms");
-        Debug.Log($"[Performance Test] Avg: {avg:F4}ms");
+        Debug.Log($"[Performance Test] Min: {min}ms");
+        Debug.Log($"[Performance Test] Max: {max}ms");
+        Debug.Log($"[Performance Test] Avg: {avg}ms");
 
         if (max < 2.0)
         {
-            Debug.Log("[Performance Test] ✅ PASS - All cycles under 2ms target!");
+            Debug.Log("[Performance Test] PASS - All cycles under 2ms target!");
         }
         else
         {
-            Debug.LogWarning($"[Performance Test] ⚠️ FAIL - Max time {max:F4}ms exceeds 2ms target");
+            Debug.LogWarning($"[Performance Test] FAIL - Max time {max}ms exceeds 2ms target");
         }
 
         Debug.Log("===== PERFORMANCE TEST END =====");
