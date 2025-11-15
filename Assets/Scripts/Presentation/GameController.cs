@@ -84,7 +84,7 @@ public class GameController : MonoBehaviour
         clickAction.canceled += OnPointerUp;
 
         // Performance test action (Press P key)
-        performanceTestAction = new InputAction(type: InputActionType.Button, binding: "<Keyboard>/p");
+        performanceTestAction = new InputAction(type: InputActionType.Button, binding: "<Keyboard>/t");
         performanceTestAction.performed += OnPerformanceTest;
 
         // Initialize view if assigned
