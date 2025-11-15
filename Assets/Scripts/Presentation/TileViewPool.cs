@@ -79,14 +79,4 @@ public class TileViewPool
         }
         activeViews.Clear();
     }
-
-    /// <summary>
-    /// Get count of active views.
-    /// </summary>
-    public int ActiveCount => activeViews.Count;
-
-    /// <summary>
-    /// Get count of available views in pool.
-    /// </summary>
-    public int AvailableCount => availableViews.Count;
 }
